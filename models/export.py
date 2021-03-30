@@ -21,12 +21,14 @@ from utils.torch_utils import select_device
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='./runs/train/exp3/weights/best.pt', help='weights path')  # from yolov5/models/
+    parser.add_argument('--weights', type=str, default='./weights/yolov5m.pt', help='weights path')  # from yolov5/models/
+    # ./runs/train/exp3/weights/best.pt
     parser.add_argument('--img-size', nargs='+', type=int, default=[416, 416], help='image size')  # height, width
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
     parser.add_argument('--dynamic', action='store_true', help='dynamic ONNX axes')
     parser.add_argument('--grid', action='store_true', help='export Detect() layer grid')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--rknn_mode', action='store_true', help='export rknn-friendly onnx model')
     opt = parser.parse_args()
     opt.img_size *= 2 if len(opt.img_size) == 1 else 1  # expand
     print(opt)
@@ -45,16 +47,83 @@ if __name__ == '__main__':
     # Input
     img = torch.zeros(opt.batch_size, 3, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
 
+
     # Update model
-    for k, m in model.named_modules():
-        m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatibility
-        if isinstance(m, models.common.Conv):  # assign export-friendly activations
-            if isinstance(m.act, nn.Hardswish):
-                m.act = Hardswish()
-            elif isinstance(m.act, nn.SiLU):
-                m.act = SiLU()
-        # elif isinstance(m, models.yolo.Detect):
-        #     m.forward = m.forward_export  # assign forward (optional)
+    if opt.rknn_mode != True:
+        for k, m in model.named_modules():
+            m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatibility
+            if isinstance(m, models.common.Conv):  # assign export-friendly activations
+                if isinstance(m.act, nn.Hardswish):
+                    m.act = Hardswish()
+                elif isinstance(m.act, nn.SiLU):
+                    m.act = SiLU()
+            # elif isinstance(m, models.yolo.Detect):
+            #     m.forward = m.forward_export  # assign forward (optional)
+
+    else:
+        # Update model
+        from models.common_rk_plug_in import surrogate_silu
+        from models import common
+        for k, m in model.named_modules():
+            m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatibility
+            if isinstance(m, common.Conv):  # assign export-friendly activations
+                if isinstance(m.act, torch.nn.Hardswish):
+                    m.act = torch.nn.Hardswish()
+                elif isinstance(m.act, torch.nn.SiLU):
+                    # m.act = SiLU()
+                    m.act = surrogate_silu()
+            # elif isinstance(m, models.yolo.Detect):
+            #     m.forward = m.forward_export  # assign forward (optional)
+
+        ### use deconv2d to surrogate upsample layer.
+        replace_one = torch.nn.ConvTranspose2d(model.model[10].conv.weight.shape[0],
+                                               model.model[10].conv.weight.shape[0],
+                                               (2, 2),
+                                               groups=model.model[10].conv.weight.shape[0],
+                                               bias=False,
+                                               stride=(2, 2))
+        replace_one.weight.data.fill_(1)
+        replace_one.eval()
+        temp_i = model.model[11].i
+        temp_f = model.model[11].f
+        model.model[11] = replace_one
+        model.model[11].i = temp_i
+        model.model[11].f = temp_f
+
+        replace_one = torch.nn.ConvTranspose2d(model.model[14].conv.weight.shape[0],
+                                               model.model[14].conv.weight.shape[0],
+                                               (2, 2),
+                                               groups=model.model[14].conv.weight.shape[0],
+                                               bias=False,
+                                               stride=(2, 2))
+        replace_one.weight.data.fill_(1)
+        replace_one.eval()
+        temp_i = model.model[11].i
+        temp_f = model.model[11].f
+        model.model[15] = replace_one
+        model.model[15].i = temp_i
+        model.model[15].f = temp_f
+
+        ### use conv to surrogate slice operator
+        from models.common_rk_plug_in import surrogate_focus
+        surrogate_focous = surrogate_focus(int(model.model[0].conv.conv.weight.shape[1]/4),
+                                           model.model[0].conv.conv.weight.shape[0],
+                                           k=tuple(model.model[0].conv.conv.weight.shape[2:4]),
+                                           s=model.model[0].conv.conv.stride,
+                                           p=model.model[0].conv.conv.padding,
+                                           g=model.model[0].conv.conv.groups,
+                                           act=True)
+        surrogate_focous.conv.conv.weight = model.model[0].conv.conv.weight
+        surrogate_focous.conv.conv.bias = model.model[0].conv.conv.bias
+        surrogate_focous.conv.act = model.model[0].conv.act
+        temp_i = model.model[0].i
+        temp_f = model.model[0].f
+
+        model.model[0] = surrogate_focous
+        model.model[0].i = temp_i
+        model.model[0].f = temp_f
+        model.model[0].eval()
+
 
     model.model[-1].export = not opt.grid  # set Detect() layer grid export
     y = model(img)  # dry run
@@ -64,7 +133,7 @@ if __name__ == '__main__':
 
         print('\nStarting ONNX export with onnx %s...' % onnx.__version__)
         f = opt.weights.replace('.pt', '.onnx')  # filename
-        torch.onnx.export(model, img, f, verbose=False, opset_version=10, input_names=['images'],
+        torch.onnx.export(model, img, f, verbose=False, opset_version=12, input_names=['images'],
                           output_names=['classes', 'boxes'] if y is None else ['output'],
                           dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},  # size(1,3,640,640)
                                         'output': {0: 'batch', 2: 'y', 3: 'x'}} if opt.dynamic else None)

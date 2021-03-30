@@ -33,14 +33,79 @@ def detect(save_img=False):
     model = attempt_load(weights, map_location=device)  # load FP32 model
     stride = int(model.stride.max())  # model stride
     imgsz = check_img_size(imgsz, s=stride)  # check img_size
-    if half:
-        model.half()  # to FP16
 
     # Second-stage classifier
     classify = False
     if classify:
         modelc = load_classifier(name='resnet101', n=2)  # initialize
         modelc.load_state_dict(torch.load('weights/resnet101.pt', map_location=device)['model']).to(device).eval()
+
+    if opt.rknn_mode == True:
+        print('model convert to rknn_mode')
+        from models.common_rk_plug_in import surrogate_silu, surrogate_hardswish
+        from models import common
+        for k, m in model.named_modules():
+            m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatibility
+            if isinstance(m, common.Conv):  # assign export-friendly activations
+                if isinstance(m.act, torch.nn.Hardswish):
+                    m.act = torch.nn.Hardswish()
+                elif isinstance(m.act, torch.nn.SiLU):
+                    # m.act = SiLU()
+                    m.act = surrogate_silu()
+            # elif isinstance(m, models.yolo.Detect):
+            #     m.forward = m.forward_export  # assign forward (optional)
+
+        ### use deconv2d to surrogate upsample layer.
+        replace_one = torch.nn.ConvTranspose2d(model.model[10].conv.weight.shape[0],
+                                               model.model[10].conv.weight.shape[0],
+                                               (2, 2),
+                                               groups=model.model[10].conv.weight.shape[0],
+                                               bias=False,
+                                               stride=(2, 2))
+        replace_one.weight.data.fill_(1)
+        replace_one.eval().to(device)
+        temp_i = model.model[11].i
+        temp_f = model.model[11].f
+        model.model[11] = replace_one
+        model.model[11].i = temp_i
+        model.model[11].f = temp_f
+
+        replace_one = torch.nn.ConvTranspose2d(model.model[14].conv.weight.shape[0],
+                                               model.model[14].conv.weight.shape[0],
+                                               (2, 2),
+                                               groups=model.model[14].conv.weight.shape[0],
+                                               bias=False,
+                                               stride=(2, 2))
+        replace_one.weight.data.fill_(1)
+        replace_one.eval().to(device)
+        temp_i = model.model[11].i
+        temp_f = model.model[11].f
+        model.model[15] = replace_one
+        model.model[15].i = temp_i
+        model.model[15].f = temp_f
+
+        ### use conv to surrogate slice operator
+        from models.common_rk_plug_in import surrogate_focus
+        surrogate_focous = surrogate_focus(int(model.model[0].conv.conv.weight.shape[1]/4),
+                                           model.model[0].conv.conv.weight.shape[0],
+                                           k=tuple(model.model[0].conv.conv.weight.shape[2:4]),
+                                           s=model.model[0].conv.conv.stride,
+                                           p=model.model[0].conv.conv.padding,
+                                           g=model.model[0].conv.conv.groups,
+                                           act=True)
+        surrogate_focous.conv.conv.weight = model.model[0].conv.conv.weight
+        surrogate_focous.conv.conv.bias = model.model[0].conv.conv.bias
+        surrogate_focous.conv.act = model.model[0].conv.act
+        temp_i = model.model[0].i
+        temp_f = model.model[0].f
+
+        model.model[0] = surrogate_focous
+        model.model[0].i = temp_i
+        model.model[0].f = temp_f
+        model.model[0].eval().to(device)
+
+    if half:
+        model.half()  # to FP16
 
     # Set Dataloader
     vid_path, vid_writer = None, None
@@ -54,6 +119,7 @@ def detect(save_img=False):
 
     # Get names and colors
     names = model.module.names if hasattr(model, 'module') else model.names
+    print('names', names)
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
 
     # Run inference
@@ -110,7 +176,7 @@ def detect(save_img=False):
 
                     if save_img or view_img:  # Add bbox to image
                         label = f'{names[int(cls)]} {conf:.2f}'
-                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)
+                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=2)
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({t2 - t1:.3f}s)')
@@ -146,9 +212,9 @@ def detect(save_img=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default='./runs/train/exp3/weights/best.pt', help='model.pt path(s)')
-    parser.add_argument('--source', type=str, default=r'D:\workspace\LMO\_temp_data\baize\merged_data\64.jpg', help='source')  # file/folder, 0 for webcam
-    parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
+    parser.add_argument('--weights', nargs='+', type=str, default='./weights/yolov5m.pt', help='model.pt path(s)')
+    parser.add_argument('--source', type=str, default=r'.\data\images', help='source')  # file/folder, 0 for webcam
+    parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
@@ -162,6 +228,7 @@ if __name__ == '__main__':
     parser.add_argument('--project', default='runs/detect', help='save results to project/name')
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+    parser.add_argument('--rknn_mode', action='store_true',  help='export rknn-friendly onnx model')
     opt = parser.parse_args()
     print(opt)
     # check_requirements(exclude=('pycocotools', 'thop'))

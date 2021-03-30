@@ -4,9 +4,29 @@
 
 模型训练：python3 train.py
 
-模型导出：python3 models/export.py --weights "xxx.pt"
+模型导出：python3 models/export.py --rknn_mode
+
+模型预测：python3 detect.py --rknn_mode
 
 
+
+使用说明：
+
+​		训练、测试及其他操作均与原版本 Yolov5 一致。模型测试、导出时增添 rknn_mode 模式，导出对rknn友好型模型。（opset_version=12, rknn_toolkit_1.6.0）
+
+
+
+修改说明：
+
+- onnx.opset_version=12 不支持 SiLU 激活层，增添等价替代模型。(x* sigmoid(x))
+- onnx.upsample.opset_version=12 在 rknn_toolkit_1.6.0的实现 暂时存在问题，增添等价替换模型。(反卷积)
+- onnx.slice.opset_version=12 在 rknn_toolkit_1.6.0 的模型载入会有报错。增添等价替换模型。(卷积)
+
+
+
+
+
+========================	以下为老版本的npu速度测试。
 
 修改部分：
 
@@ -41,7 +61,7 @@
 
 \* 是指基于原版的yaml配置，激活层修改为relu，去除头部slice，cat操作。下同。
 
-\*\* optimize是指在导出模型时进行优化，包括但不限于剪枝、稀疏化的方式，优化后精度保持99.5%以上，该方法目前暂不开源，提供代转模型服务，联系方式->http://www.lmo-aiot.com/
+\*\* optimize是指在导出模型时进行优化，包括但不限于剪枝、稀疏化的方式，优化后精度保持99.5%以上，该方法目前暂不开源，提供代转模型服务。
 
 *\*\*  统计时间包含 **rknn_inputs_set**、**rknn_run**、**rknn_outputs_get** 三部分时间，不包含cpu端后处理时间。除模拟器评估外，本表其他平台的测试均遵循此原则。
 
@@ -53,9 +73,9 @@
 
 TODO
 
-- [ ] 兼容前端的slice操作。
-- [ ] 兼容原版激活函数。
-
+- [x] 兼容前端的slice操作。
+- [x] 兼容原版激活函数。
+- [ ] npu速度依据导出模型结构变动，重测
 - [ ] 开源优化方式，时间待定。
 
 
@@ -68,5 +88,7 @@ https://github.com/ultralytics/yolov5
 
 
 
+技术交流群：
 
+QQ群：810456486
 
