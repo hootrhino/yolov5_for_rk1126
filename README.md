@@ -14,6 +14,8 @@
 
 ​		训练、测试及其他操作均与原版本 Yolov5 一致。模型测试、导出时增添 rknn_mode 模式，导出对rknn友好型模型。（opset_version=12, rknn_toolkit_1.6.0）
 
+​		在 rk_npu 上体验原汁原味的 yolov5 吧 (★ ω ★)
+
 
 
 修改说明：
