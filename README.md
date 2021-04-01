@@ -12,23 +12,26 @@
 
 使用说明：
 
-​		训练、测试及其他操作均与原版本 Yolov5 一致。模型测试、导出时增添 rknn_mode 模式，导出对rknn友好型模型。（opset_version=12, rknn_toolkit_1.6.0）
-
-​		在 rk_npu 上体验原汁原味的 yolov5 吧 (★ ω ★)
+​		将common文件中激活层修改为ReLU, 此外训练、测试及其他操作均与原版本 Yolov5 一致。模型测试、导出时增添 rknn_mode 模式，导出对rknn友好型模型。（opset_version=10, rknn_toolkit_1.6.0）
 
 
 
 修改说明：
 
-- onnx.opset_version=12 不支持 SiLU 激活层，增添等价替代模型。(x* sigmoid(x))
-- onnx.upsample.opset_version=12 在 rknn_toolkit_1.6.0的实现 暂时存在问题，增添等价替换模型。(反卷积)
-- onnx.slice.opset_version=12 在 rknn_toolkit_1.6.0 的模型载入会有报错。增添等价替换模型。(卷积)
+- onnx.slice 在 rknn_toolkit_1.6.0 的模型载入会有报错。增添等价替换模型。(卷积)
+
+
+
+已知问题：
+
+- onnx.opset_version=12 不支持 SiLU 激活层，可增添等价替代模型解决。(x* sigmoid(x))。但是rknn_toolkit_1_6_0 模拟中结果正常，部署到板子端会出现异常。暂不适用。
+-  onnx.upsample.opset_version=12 在 rknn_toolkit_1.6.0的实现 暂时存在问题，增添等价替换模型。(反卷积) 。rknn_toolkit_1_6_0模拟中结果正常，部署到板子端会出现异常。暂不适用。
 
 
 
 
 
-========================	以下为老版本的npu速度测试。
+========================	以下为老版本的npu速度测试   ===========================
 
 修改部分：
 
