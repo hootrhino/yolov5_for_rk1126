@@ -4,6 +4,7 @@ from pathlib import Path
 
 import cv2
 import torch
+import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from numpy import random
 
@@ -50,39 +51,40 @@ def detect(save_img=False):
                 if isinstance(m.act, torch.nn.Hardswish):
                     m.act = torch.nn.Hardswish()
                 elif isinstance(m.act, torch.nn.SiLU):
-                    # m.act = SiLU()
+                    # m.act = torch.nn.SiLU()
                     m.act = surrogate_silu()
             # elif isinstance(m, models.yolo.Detect):
             #     m.forward = m.forward_export  # assign forward (optional)
 
-        ### use deconv2d to surrogate upsample layer.
-        replace_one = torch.nn.ConvTranspose2d(model.model[10].conv.weight.shape[0],
-                                               model.model[10].conv.weight.shape[0],
-                                               (2, 2),
-                                               groups=model.model[10].conv.weight.shape[0],
-                                               bias=False,
-                                               stride=(2, 2))
-        replace_one.weight.data.fill_(1)
-        replace_one.eval().to(device)
-        temp_i = model.model[11].i
-        temp_f = model.model[11].f
-        model.model[11] = replace_one
-        model.model[11].i = temp_i
-        model.model[11].f = temp_f
 
-        replace_one = torch.nn.ConvTranspose2d(model.model[14].conv.weight.shape[0],
-                                               model.model[14].conv.weight.shape[0],
-                                               (2, 2),
-                                               groups=model.model[14].conv.weight.shape[0],
-                                               bias=False,
-                                               stride=(2, 2))
-        replace_one.weight.data.fill_(1)
-        replace_one.eval().to(device)
-        temp_i = model.model[11].i
-        temp_f = model.model[11].f
-        model.model[15] = replace_one
-        model.model[15].i = temp_i
-        model.model[15].f = temp_f
+        ### use deconv2d to surrogate upsample layer.
+        # replace_one = torch.nn.ConvTranspose2d(model.model[10].conv.weight.shape[0],
+        #                                        model.model[10].conv.weight.shape[0],
+        #                                        (2, 2),
+        #                                        groups=model.model[10].conv.weight.shape[0],
+        #                                        bias=False,
+        #                                        stride=(2, 2))
+        # replace_one.weight.data.fill_(1)
+        # replace_one.eval().to(device)
+        # temp_i = model.model[11].i
+        # temp_f = model.model[11].f
+        # model.model[11] = replace_one
+        # model.model[11].i = temp_i
+        # model.model[11].f = temp_f
+
+        # replace_one = torch.nn.ConvTranspose2d(model.model[14].conv.weight.shape[0],
+        #                                        model.model[14].conv.weight.shape[0],
+        #                                        (2, 2),
+        #                                        groups=model.model[14].conv.weight.shape[0],
+        #                                        bias=False,
+        #                                        stride=(2, 2))
+        # replace_one.weight.data.fill_(1)
+        # replace_one.eval().to(device)
+        # temp_i = model.model[11].i
+        # temp_f = model.model[11].f
+        # model.model[15] = replace_one
+        # model.model[15].i = temp_i
+        # model.model[15].f = temp_f
 
         ### use conv to surrogate slice operator
         from models.common_rk_plug_in import surrogate_focus
@@ -212,9 +214,9 @@ def detect(save_img=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default='./weights/yolov5m.pt', help='model.pt path(s)')
-    parser.add_argument('--source', type=str, default=r'.\data\images', help='source')  # file/folder, 0 for webcam
-    parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
+    parser.add_argument('--weights', nargs='+', type=str, default='./runs/train/exp/weights/best.pt', help='model.pt path(s)')
+    parser.add_argument('--source', type=str, default=r'D:\data\liftcar_tuyang\convert_416x416\val_data\liftcar_tuyang_1.jpg', help='source')  # file/folder, 0 for webcam
+    parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')

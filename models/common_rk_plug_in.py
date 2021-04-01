@@ -31,29 +31,30 @@ class surrogate_focus(nn.Module):
         super(surrogate_focus, self).__init__()
         self.conv = Conv(c1 * 4, c2, k, s, p, g, act)
 
-        self.conv1 = nn.Conv2d(3, 3, (2, 2), groups=3, bias=False, stride=(2, 2))
-        self.conv1.weight[:, :, 0, 0] = 1
-        self.conv1.weight[:, :, 0, 1] = 0
-        self.conv1.weight[:, :, 1, 0] = 0
-        self.conv1.weight[:, :, 1, 1] = 0
+        with torch.no_grad():
+            self.conv1 = nn.Conv2d(3, 3, (2, 2), groups=3, bias=False, stride=(2, 2))
+            self.conv1.weight[:, :, 0, 0] = 1
+            self.conv1.weight[:, :, 0, 1] = 0
+            self.conv1.weight[:, :, 1, 0] = 0
+            self.conv1.weight[:, :, 1, 1] = 0
 
-        self.conv2 = nn.Conv2d(3, 3, (2, 2), groups=3, bias=False, stride=(2, 2))
-        self.conv2.weight[:, :, 0, 0] = 0
-        self.conv2.weight[:, :, 0, 1] = 0
-        self.conv2.weight[:, :, 1, 0] = 1
-        self.conv2.weight[:, :, 1, 1] = 0
+            self.conv2 = nn.Conv2d(3, 3, (2, 2), groups=3, bias=False, stride=(2, 2))
+            self.conv2.weight[:, :, 0, 0] = 0
+            self.conv2.weight[:, :, 0, 1] = 0
+            self.conv2.weight[:, :, 1, 0] = 1
+            self.conv2.weight[:, :, 1, 1] = 0
 
-        self.conv3 = nn.Conv2d(3, 3, (2, 2), groups=3, bias=False, stride=(2, 2))
-        self.conv3.weight[:, :, 0, 0] = 0
-        self.conv3.weight[:, :, 0, 1] = 1
-        self.conv3.weight[:, :, 1, 0] = 0
-        self.conv3.weight[:, :, 1, 1] = 0
+            self.conv3 = nn.Conv2d(3, 3, (2, 2), groups=3, bias=False, stride=(2, 2))
+            self.conv3.weight[:, :, 0, 0] = 0
+            self.conv3.weight[:, :, 0, 1] = 1
+            self.conv3.weight[:, :, 1, 0] = 0
+            self.conv3.weight[:, :, 1, 1] = 0
 
-        self.conv4 = nn.Conv2d(3, 3, (2, 2), groups=3, bias=False, stride=(2, 2))
-        self.conv4.weight[:, :, 0, 0] = 0
-        self.conv4.weight[:, :, 0, 1] = 0
-        self.conv4.weight[:, :, 1, 0] = 0
-        self.conv4.weight[:, :, 1, 1] = 1
+            self.conv4 = nn.Conv2d(3, 3, (2, 2), groups=3, bias=False, stride=(2, 2))
+            self.conv4.weight[:, :, 0, 0] = 0
+            self.conv4.weight[:, :, 0, 1] = 0
+            self.conv4.weight[:, :, 1, 0] = 0
+            self.conv4.weight[:, :, 1, 1] = 1
 
     def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
         return self.conv(torch.cat([self.conv1(x), self.conv2(x), self.conv3(x), self.conv4(x)], 1))
