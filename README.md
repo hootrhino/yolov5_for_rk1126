@@ -24,8 +24,8 @@
 
 已知问题：
 
-- onnx.opset_version=12 不支持 SiLU 激活层，可增添等价替代模型解决。(x* sigmoid(x))。但是rknn_toolkit_1_6_0 模拟中结果正常，部署到板子端会出现异常。默认暂不适用。
--  onnx.upsample.opset_version=12 在 rknn_toolkit_1.6.0的实现 暂时存在问题，增添等价替换模型。(反卷积) 。rknn_toolkit_1_6_0模拟中结果正常，部署到板子端会出现异常。默认暂不适用。
+- onnx.opset_version=12 不支持 SiLU 激活层，可增添等价替代模型解决。(x* sigmoid(x))。但是rknn_toolkit_1_6_0 模拟中结果正常，部署到板子端会出现异常。默认暂不使用。
+-  onnx.upsample.opset_version=12 在 rknn_toolkit_1.6.0的实现 暂时存在问题，增添等价替换模型。(反卷积) 。rknn_toolkit_1_6_0模拟中结果正常，部署到板子端会出现异常。默认暂不使用。
 
 
 
