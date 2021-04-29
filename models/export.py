@@ -22,12 +22,14 @@ from utils.torch_utils import select_device
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str, default=r'D:\workspace\LMO\opengit\yolov5\runs\train\exp\weights\best.pt', help='weights path')  # from yolov5/models/
-    parser.add_argument('--img-size', nargs='+', type=int, default=[416, 416], help='image size')  # height, width
+    parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='image size')  # height, width
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
     parser.add_argument('--dynamic', action='store_true', help='dynamic ONNX axes')
     parser.add_argument('--grid', action='store_true', help='export Detect() layer grid')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--rknn_mode', action='store_true', help='export rknn-friendly onnx model')
+    parser.add_argument('--ignore_output_permute', action='store_true', help='export model without permute layer,which can be used for rknn_yolov5_demo c++ code')
+    parser.add_argument('--add_image_preprocess_layer', action='store_true', help='add image preprocess layer, benefit for decreasing rknn_input_set time-cost')
     opt = parser.parse_args()
     opt.img_size *= 2 if len(opt.img_size) == 1 else 1  # expand
     print(opt)
@@ -123,8 +125,15 @@ if __name__ == '__main__':
         model.model[0].f = temp_f
         model.model[0].eval()
 
-
     model.model[-1].export = not opt.grid  # set Detect() layer grid export
+
+    if opt.ignore_output_permute is True:
+        model.model[-1].ignore_permute_layer = True
+
+    if opt.add_image_preprocess_layer is True:
+        from models.common_rk_plug_in import preprocess_conv_layer
+        model = preprocess_conv_layer(model, 0, 255, True)
+
     y = model(img)  # dry run
     # ONNX export
     try:

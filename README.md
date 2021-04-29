@@ -24,10 +24,24 @@
 
 
 
+***4.29更新***：
+
+- 导出模型可选择去掉尾端的permute层，从而**兼容rknn_yolov5_demo的c++部署代码**
+
+  `python3 models/export.py --rknn_mode --ignore_output_permute`
+
+- 导出模型可选择增加**图片预处理层**，可**有效降低部署段 rknn_input_set 的时间耗时**。具体使用方法参考 models/common_rk_plug_in.py 里的 preprocess_conv_layer 的说明。
+
+  `python3 models/export.py --rknn_mode --add_image_preprocess_layer`
+
+  （rknn_mode、ignore_output_permute、add_image_preprocess_layer 三者不互斥，可同时使用）
+
+
+
 ## 已知问题说明(不影响目前使用)：
 
 - onnx.opset_version=12 不支持 SiLU 激活层，可增添等价替代模型解决。(x* sigmoid(x)) 但是rknn_toolkit_1_6_0 模拟中结果正常，部署到板子端会出现异常。默认暂不使用，等待rk修复。
--  onnx.upsample.opset_version=12 在 rknn_toolkit_1.6.0的实现 暂时存在问题，增添等价替换模型。(反卷积) 。rknn_toolkit_1_6_0模拟中结果正常，部署到板子端会出现异常。默认暂不使用，等待rk修复
+-  onnx.upsample.opset_version=12 在 rknn_toolkit_1.6.0的实现 暂时存在问题，增添等价替换模型。(反卷积) 。rknn_toolkit_1_6_0模拟中结果正常，部署到板子端会出现异常。默认暂不使用，等待rk修复。
 
 
 

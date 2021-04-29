@@ -22,6 +22,7 @@ except ImportError:
 class Detect(nn.Module):
     stride = None  # strides computed during build
     export = False  # onnx export
+    ignore_permute_layer = False
 
     def __init__(self, nc=80, anchors=(), ch=()):  # detection layer
         super(Detect, self).__init__()
@@ -41,6 +42,10 @@ class Detect(nn.Module):
         self.training |= self.export
         for i in range(self.nl):
             x[i] = self.m[i](x[i])  # conv
+
+            if self.ignore_permute_layer is True:
+                continue
+
             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
             x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
 
