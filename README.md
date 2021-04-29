@@ -36,6 +36,8 @@
 
   （rknn_mode、ignore_output_permute、add_image_preprocess_layer 三者不互斥，可同时使用）
 
+- 增加onnx->rknn模型导出工具，详见rknn_convert_tools文件夹。
+
 
 
 ## 已知问题说明(不影响目前使用)：
