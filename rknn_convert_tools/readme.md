@@ -59,8 +59,8 @@ config:							# 模型转换参数，具体子参数意义详见rk文档
   quantized_dtype: 'asymmetric_quantized-u8' # asymmetric_quantized-u8,dynamic_fixed_point-8,dynamic_fixed_point-16
   optimization_level: 1
 
-build:							# 模型构建参数，具体子参数意义详见rk文档。
-								# 当模型为rknn类型时，会跳过这一步骤。
+build:
+# 模型构建参数，具体子参数意义详见rk文档。当模型为rknn类型时，会跳过这一步骤。
   do_quantization: True
   dataset: './single_dataset.txt' 
   pre_compile: False
@@ -68,8 +68,8 @@ build:							# 模型构建参数，具体子参数意义详见rk文档。
 export_rknn:					# 模型导出的路径
   export_path: './best.rknn'
 
-init_runtime:					# 模型初始化参数，一般无需改动。
-								# 当 inference 和 eval_perf 都不执行时，会跳过这一步骤。
+init_runtime:
+# 模型初始化参数，一般无需改动。当 inference 和 eval_perf 都不执行时，会跳过这一步骤。
   target: null
   device_id: null
   perf_debug: False
