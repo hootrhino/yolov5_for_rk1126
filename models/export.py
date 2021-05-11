@@ -45,10 +45,6 @@ if __name__ == '__main__':
     gs = int(max(model.stride))  # grid size (max stride)
     opt.img_size = [check_img_size(x, gs) for x in opt.img_size]  # verify img_size are gs-multiples
 
-    # Input
-    img = torch.zeros(opt.batch_size, 3, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
-
-
     # Update model
     if opt.rknn_mode != True:
         for k, m in model.named_modules():
@@ -133,6 +129,9 @@ if __name__ == '__main__':
     if opt.add_image_preprocess_layer is True:
         from models.common_rk_plug_in import preprocess_conv_layer
         model = preprocess_conv_layer(model, 0, 255, True)
+        img = torch.zeros(opt.batch_size, *opt.img_size, 3).to(device)
+    else:
+        img = torch.zeros(opt.batch_size, 3, *opt.img_size).to(device)
 
     y = model(img)  # dry run
     # ONNX export
