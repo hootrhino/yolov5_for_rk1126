@@ -72,6 +72,20 @@ if __name__ == '__main__':
             # elif isinstance(m, models.yolo.Detect):
             #     m.forward = m.forward_export  # assign forward (optional)
 
+            if isinstance(m, models.common.SPP):  # assign export-friendly activations
+                ### best
+                # tmp = nn.Sequential(*[nn.MaxPool2d(kernel_size=3, stride=1, padding=1) for i in range(2)])
+                # m.m[0] = tmp
+                # m.m[1] = tmp
+                # m.m[2] = tmp
+                ### friendly to origin config
+                tmp = nn.Sequential(*[nn.MaxPool2d(kernel_size=3, stride=1, padding=1) for i in range(2)])
+                m.m[0] = tmp
+                tmp = nn.Sequential(*[nn.MaxPool2d(kernel_size=3, stride=1, padding=1) for i in range(4)])
+                m.m[1] = tmp
+                tmp = nn.Sequential(*[nn.MaxPool2d(kernel_size=3, stride=1, padding=1) for i in range(6)])
+                m.m[2] = tmp
+
         ### use deconv2d to surrogate upsample layer.
         # replace_one = torch.nn.ConvTranspose2d(model.model[10].conv.weight.shape[0],
         #                                        model.model[10].conv.weight.shape[0],
