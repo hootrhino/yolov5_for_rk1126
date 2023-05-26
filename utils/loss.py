@@ -174,43 +174,78 @@ class ComputeLoss:
                             # [1, 1], [1, -1], [-1, 1], [-1, -1],  # jk,jm,lk,lm
                             ], device=targets.device).float() * g  # offsets
 
-        for i in range(self.nl):
-            anchors = self.anchors[i]
-            gain[2:6] = torch.tensor(p[i].shape)[[3, 2, 3, 2]]  # xyxy gain
+        # for i in range(self.nl):
+        #     anchors = self.anchors[i]
+        #     gain[2:6] = torch.tensor(p[i].shape)[[3, 2, 3, 2]]  # xyxy gain
 
+        #     # Match targets to anchors
+        #     t = targets * gain
+        #     if nt:
+        #         # Matches
+        #         r = t[:, :, 4:6] / anchors[:, None]  # wh ratio
+        #         j = torch.max(r, 1. / r).max(2)[0] < self.hyp['anchor_t']  # compare
+        #         # j = wh_iou(anchors, t[:, 4:6]) > model.hyp['iou_t']  # iou(3,n)=wh_iou(anchors(3,2), gwh(n,2))
+        #         t = t[j]  # filter
+
+        #         # Offsets
+        #         gxy = t[:, 2:4]  # grid xy
+        #         gxi = gain[[2, 3]] - gxy  # inverse
+        #         j, k = ((gxy % 1. < g) & (gxy > 1.)).T
+        #         l, m = ((gxi % 1. < g) & (gxi > 1.)).T
+        #         j = torch.stack((torch.ones_like(j), j, k, l, m))
+        #         t = t.repeat((5, 1, 1))[j]
+        #         offsets = (torch.zeros_like(gxy)[None] + off[:, None])[j]
+        #     else:
+        #         t = targets[0]
+        #         offsets = 0
+
+        #     # Define
+        #     b, c = t[:, :2].long().T  # image, class
+        #     gxy = t[:, 2:4]  # grid xy
+        #     gwh = t[:, 4:6]  # grid wh
+        #     gij = (gxy - offsets).long()
+        #     gi, gj = gij.T  # grid xy indices
+
+        #     # Append
+        #     a = t[:, 6].long()  # anchor indices
+        #     indices.append((b, a, gj.clamp_(0, gain[3] - 1), gi.clamp_(0, gain[2] - 1)))  # image, anchor, grid indices
+        #     tbox.append(torch.cat((gxy - gij, gwh), 1))  # box
+        #     anch.append(anchors[a])  # anchors
+        #     tcls.append(c)  # class
+        for i in range(self.nl):
+            anchors, shape = self.anchors[i], p[i].shape
+            gain[2:6] = torch.tensor(shape)[[3, 2, 3, 2]]  # xyxy gain
+ 
             # Match targets to anchors
-            t = targets * gain
+            t = targets * gain  # shape(3,n,7)
             if nt:
                 # Matches
-                r = t[:, :, 4:6] / anchors[:, None]  # wh ratio
-                j = torch.max(r, 1. / r).max(2)[0] < self.hyp['anchor_t']  # compare
+                r = t[..., 4:6] / anchors[:, None]  # wh ratio
+                j = torch.max(r, 1 / r).max(2)[0] < self.hyp['anchor_t']  # compare
                 # j = wh_iou(anchors, t[:, 4:6]) > model.hyp['iou_t']  # iou(3,n)=wh_iou(anchors(3,2), gwh(n,2))
                 t = t[j]  # filter
-
+ 
                 # Offsets
                 gxy = t[:, 2:4]  # grid xy
                 gxi = gain[[2, 3]] - gxy  # inverse
-                j, k = ((gxy % 1. < g) & (gxy > 1.)).T
-                l, m = ((gxi % 1. < g) & (gxi > 1.)).T
+                j, k = ((gxy % 1 < g) & (gxy > 1)).T
+                l, m = ((gxi % 1 < g) & (gxi > 1)).T
                 j = torch.stack((torch.ones_like(j), j, k, l, m))
                 t = t.repeat((5, 1, 1))[j]
                 offsets = (torch.zeros_like(gxy)[None] + off[:, None])[j]
             else:
                 t = targets[0]
                 offsets = 0
-
+ 
             # Define
-            b, c = t[:, :2].long().T  # image, class
-            gxy = t[:, 2:4]  # grid xy
-            gwh = t[:, 4:6]  # grid wh
+            bc, gxy, gwh, a = t.chunk(4, 1)  # (image, class), grid xy, grid wh, anchors
+            a, (b, c) = a.long().view(-1), bc.long().T  # anchors, image, class
             gij = (gxy - offsets).long()
-            gi, gj = gij.T  # grid xy indices
-
+            gi, gj = gij.T  # grid indices
+ 
             # Append
-            a = t[:, 6].long()  # anchor indices
-            indices.append((b, a, gj.clamp_(0, gain[3] - 1), gi.clamp_(0, gain[2] - 1)))  # image, anchor, grid indices
+            indices.append((b, a, gj.clamp_(0, shape[2] - 1), gi.clamp_(0, shape[3] - 1)))  # image, anchor, grid
             tbox.append(torch.cat((gxy - gij, gwh), 1))  # box
             anch.append(anchors[a])  # anchors
             tcls.append(c)  # class
-
         return tcls, tbox, indices, anch
